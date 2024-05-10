@@ -250,23 +250,23 @@ class BEVFusion(Base3DFusionModel):
             # avoid OOM
             features = features[::-1]
 
-        if self.fuser is not None:
-            x = self.fuser(features)
+        if self.fuser is not None: # 将图像和点云特征concat后进行卷积，进行初步融合
+            x = self.fuser(features) # features[0]:图像特征[B, 80, 180, 180] features[1]:点云特征[B, 256, 180, 180] x:融合后的特征，[B, 336->256, 180, 180]
         else:
             assert len(features) == 1, features
             x = features[0]
 
         batch_size = x.shape[0]
-
-        x = self.decoder["backbone"](x)
-        x = self.decoder["neck"](x)
+        # BEVencoder
+        x = self.decoder["backbone"](x) # x:[B, 128, 180, 180]
+        x = self.decoder["neck"](x) # x:[B, 512, 180, 180]
 
         if self.training:
             outputs = {}
             for type, head in self.heads.items():
                 if type == "object":
-                    pred_dict = head(x, metas)
-                    losses = head.loss(gt_bboxes_3d, gt_labels_3d, pred_dict)
+                    pred_dict = head(x, metas) # 使用transfusionHead进行检测得到检测结果
+                    losses = head.loss(gt_bboxes_3d, gt_labels_3d, pred_dict) # 计算损失
                 elif type == "map":
                     losses = head(x, gt_masks_bev)
                 else:

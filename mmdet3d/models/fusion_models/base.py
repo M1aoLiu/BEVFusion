@@ -75,8 +75,8 @@ class Base3DFusionModel(BaseModule, metaclass=ABCMeta):
                 DDP, it means the batch size on each GPU), which is used for \
                 averaging the logs.
         """
-        losses = self(**data)
-        loss, log_vars = self._parse_losses(losses)
+        losses = self(**data) # 前向传播获取损失信息
+        loss, log_vars = self._parse_losses(losses) # 解析损失信息
 
         outputs = dict(loss=loss, log_vars=log_vars, num_samples=len(data["metas"]))
 
