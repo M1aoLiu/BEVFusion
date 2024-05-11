@@ -85,12 +85,12 @@ class DepthLSSTransform(BaseDepthTransform):
         d = d.view(B * N, *d.shape[2:])
         x = x.view(B * N, C, fH, fW)
 
-        d = self.dtransform(d)
-        x = torch.cat([d, x], dim=1)
-        x = self.depthnet(x)
+        d = self.dtransform(d) # [N, 1, H, W] -> [N, 64, fW 32 ,fH 88] 得到深度feature d
+        x = torch.cat([d, x], dim=1) # [N, 320, 32, 88]
+        x = self.depthnet(x) # [N, 198, 32, 88] 经过三层卷积(depthnet)得到最终的特征 198:118深度 + 80图像feature C
 
-        depth = x[:, : self.D].softmax(dim=1)
-        x = depth.unsqueeze(1) * x[:, self.D : (self.D + self.C)].unsqueeze(2)
+        depth = x[:, : self.D].softmax(dim=1) # 对深度进行softmax
+        x = depth.unsqueeze(1) * x[:, self.D : (self.D + self.C)].unsqueeze(2) # 计算外积
 
         x = x.view(B, N, self.C, self.D, fH, fW)
         x = x.permute(0, 1, 3, 4, 5, 2)
@@ -98,5 +98,5 @@ class DepthLSSTransform(BaseDepthTransform):
 
     def forward(self, *args, **kwargs):
         x = super().forward(*args, **kwargs)
-        x = self.downsample(x)
+        x = self.downsample(x) # 下采样，[1, 80, 360, 360] -> [1, 80, 180, 180]
         return x

@@ -238,7 +238,7 @@ class BaseDepthTransform(BaseTransform):
         batch_size = len(points)
         depth = torch.zeros(batch_size, img.shape[1], 1, *self.image_size).to(
             points[0].device
-        )
+        ) # [B, views, 1, img_H 256, img_W 704]
 
         for b in range(batch_size):
             cur_coords = points[b][:, :3]
@@ -247,17 +247,17 @@ class BaseDepthTransform(BaseTransform):
             cur_lidar2image = lidar2image[b]
 
             # inverse aug
-            cur_coords -= cur_lidar_aug_matrix[:3, 3]
-            cur_coords = torch.inverse(cur_lidar_aug_matrix[:3, :3]).matmul(
+            cur_coords -= cur_lidar_aug_matrix[:3, 3] # 先减去增强的坐标位置(平移)
+            cur_coords = torch.inverse(cur_lidar_aug_matrix[:3, :3]).matmul( # 再求逆矩阵得到原始坐标(lidar坐标)
                 cur_coords.transpose(1, 0)
             )
-            # lidar2image
+            # lidar2image 使用外参矩阵进行坐标转换
             cur_coords = cur_lidar2image[:, :3, :3].matmul(cur_coords)
             cur_coords += cur_lidar2image[:, :3, 3].reshape(-1, 3, 1)
             # get 2d coords
-            dist = cur_coords[:, 2, :]
-            cur_coords[:, 2, :] = torch.clamp(cur_coords[:, 2, :], 1e-5, 1e5)
-            cur_coords[:, :2, :] /= cur_coords[:, 2:3, :]
+            dist = cur_coords[:, 2, :] # 图像坐标系下的深度信息
+            cur_coords[:, 2, :] = torch.clamp(cur_coords[:, 2, :], 1e-5, 1e5) # 将深度范围限制为[1e-5, 1e5]
+            cur_coords[:, :2, :] /= cur_coords[:, 2:3, :] # 除以深度信息，得到真实的像素坐标值
 
             # imgaug
             cur_coords = cur_img_aug_matrix[:, :3, :3].matmul(cur_coords)
@@ -265,22 +265,22 @@ class BaseDepthTransform(BaseTransform):
             cur_coords = cur_coords[:, :2, :].transpose(1, 2)
 
             # normalize coords for grid sample
-            cur_coords = cur_coords[..., [1, 0]]
+            cur_coords = cur_coords[..., [1, 0]] # 交换x,y坐标 [x,y] -> [y,x] 即[W, H] -> [H, W] 因为 self.image_size为[H, W]
 
-            on_img = (
+            on_img = ( # 判断是否落在图像上
                 (cur_coords[..., 0] < self.image_size[0])
                 & (cur_coords[..., 0] >= 0)
                 & (cur_coords[..., 1] < self.image_size[1])
                 & (cur_coords[..., 1] >= 0)
             )
             for c in range(on_img.shape[0]):
-                masked_coords = cur_coords[c, on_img[c]].long()
-                masked_dist = dist[c, on_img[c]]
-                depth[b, c, 0, masked_coords[:, 0], masked_coords[:, 1]] = masked_dist
+                masked_coords = cur_coords[c, on_img[c]].long() # pts投影到img的点的个数和img坐标 [N, 2]
+                masked_dist = dist[c, on_img[c]] # 该point投影到img时的深度信息 [N, 1]
+                depth[b, c, 0, masked_coords[:, 0], masked_coords[:, 1]] = masked_dist # depth:[B, views, 1(深度值), 256 H, 704 W] pts投影到img的深度图
 
         extra_rots = lidar_aug_matrix[..., :3, :3]
         extra_trans = lidar_aug_matrix[..., :3, 3]
-        geom = self.get_geometry(
+        geom = self.get_geometry( # geom:[B, N, D:118, 32, 88, 3] 视锥点云
             camera2lidar_rots,
             camera2lidar_trans,
             intrins,
@@ -290,6 +290,6 @@ class BaseDepthTransform(BaseTransform):
             extra_trans=extra_trans,
         )
 
-        x = self.get_cam_feats(img, depth)
-        x = self.bev_pool(geom, x)
+        x = self.get_cam_feats(img, depth) # context特征点云 [1, 6, 118, 32, 88, 80]
+        x = self.bev_pool(geom, x) # bev池化,得到BEV下的相机特征 [1, 80, 360, 360] 360: [-54, 54, 0.3]
         return x

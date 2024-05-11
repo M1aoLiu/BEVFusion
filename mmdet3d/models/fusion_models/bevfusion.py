@@ -102,14 +102,14 @@ class BEVFusion(Base3DFusionModel):
         B, N, C, H, W = x.size()
         x = x.view(B * N, C, H, W)
 
-        x = self.encoders["camera"]["backbone"](x)
-        x = self.encoders["camera"]["neck"](x)
+        x = self.encoders["camera"]["backbone"](x) # len(x):3 x[0]:[6, 192, 32, 88] x[1]:[6, 384, 16, 44] x[2]:[6, 768, 8, 22]
+        x = self.encoders["camera"]["neck"](x) # len(x):2 x[0]:[6, 256, 32, 88] x[1]:[6, 256, 16, 44]
 
         if not isinstance(x, torch.Tensor):
             x = x[0]
 
         BN, C, H, W = x.size()
-        x = x.view(B, int(BN / B), C, H, W)
+        x = x.view(B, int(BN / B), C, H, W) # [B, views, 256, 32, 88]
 
         x = self.encoders["camera"]["vtransform"](
             x,
@@ -258,8 +258,8 @@ class BEVFusion(Base3DFusionModel):
 
         batch_size = x.shape[0]
         # BEVencoder
-        x = self.decoder["backbone"](x) # x:[B, 128, 180, 180]
-        x = self.decoder["neck"](x) # x:[B, 512, 180, 180]
+        x = self.decoder["backbone"](x) # x[0]:[B, 128, 180, 180], x[1]:[B, 256, 180, 180]
+        x = self.decoder["neck"](x) # x:[B, 512, 180, 180] Fused BEV Features
 
         if self.training:
             outputs = {}
