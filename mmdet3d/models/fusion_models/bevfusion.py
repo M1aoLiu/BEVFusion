@@ -111,7 +111,7 @@ class BEVFusion(Base3DFusionModel):
         BN, C, H, W = x.size()
         x = x.view(B, int(BN / B), C, H, W) # [B, views, 256, 32, 88]
 
-        x = self.encoders["camera"]["vtransform"](
+        x = self.encoders["camera"]["vtransform"]( # cam-to-BEV view transform 将cam特征转换到BEV特征下
             x,
             points,
             camera2ego,

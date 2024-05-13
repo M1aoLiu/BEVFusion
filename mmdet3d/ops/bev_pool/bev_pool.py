@@ -83,7 +83,7 @@ class QuickCumsumCuda(torch.autograd.Function):
 def bev_pool(feats, coords, B, D, H, W):
     assert feats.shape[0] == coords.shape[0]
 
-    ranks = (
+    ranks = ( # 进行排序。coords里面是所有图像点所对应的BEV网格位置。因此相同位置的点应该被放到一起，所以排序后进行累加
         coords[:, 0] * (W * D * B)
         + coords[:, 1] * (D * B)
         + coords[:, 2] * B

@@ -789,7 +789,7 @@ model = dict(
                 voxel_size=[0.075, 0.075],
                 pc_range=[-54.0, -54.0],
                 nms_type=None),
-            common_heads=dict(
+            common_heads=dict( # [3, 2] 3表示最后输出数据的维度为3， 2表示该head对应的pred_head网络层数为2
                 center=[2, 2],
                 height=[1, 2],
                 dim=[3, 2],
@@ -814,6 +814,8 @@ model = dict(
                 type='GaussianFocalLoss', reduction='mean', loss_weight=1.0),
             loss_bbox=dict(type='L1Loss', reduction='mean',
                            loss_weight=0.25))),
+    
+    # BEVencoder
     decoder=dict(
         backbone=dict(
             type='SECOND',

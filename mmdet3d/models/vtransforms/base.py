@@ -152,13 +152,13 @@ class BaseTransform(nn.Module):
             & (geom_feats[:, 2] >= 0)
             & (geom_feats[:, 2] < self.nx[2])
         )
-        x = x[kept]
-        geom_feats = geom_feats[kept]
+        x = x[kept] # [B*N*H*W, C:80]
+        geom_feats = geom_feats[kept] # [B*N*H*W, C:4(xyz+batch_idx)]
 
-        x = bev_pool(x, geom_feats, B, self.nx[2], self.nx[0], self.nx[1])
+        x = bev_pool(x, geom_feats, B, self.nx[2], self.nx[0], self.nx[1]) # x:[B, 80, Z:1, H, W]
 
         # collapse Z
-        final = torch.cat(x.unbind(dim=2), 1)
+        final = torch.cat(x.unbind(dim=2), 1) # [B, 80, H, W]
 
         return final
 

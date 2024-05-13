@@ -226,25 +226,25 @@ class TransFusionHead(nn.Module):
         #################################
         # image to BEV
         #################################
-        lidar_feat_flatten = lidar_feat.view(
+        lidar_feat_flatten = lidar_feat.view( # 展平，后续要使用transformer
             batch_size, lidar_feat.shape[1], -1
         )  # [BS, C, H*W]
-        bev_pos = self.bev_pos.repeat(batch_size, 1, 1).to(lidar_feat.device)
+        bev_pos = self.bev_pos.repeat(batch_size, 1, 1).to(lidar_feat.device) # [B, H*W, 2]
 
         #################################
         # image guided query initialization
         #################################
-        dense_heatmap = self.heatmap_head(lidar_feat)
+        dense_heatmap = self.heatmap_head(lidar_feat) # [B, C, 180, 180]
         dense_heatmap_img = None
         heatmap = dense_heatmap.detach().sigmoid()
         padding = self.nms_kernel_size // 2
         local_max = torch.zeros_like(heatmap)
         # equals to nms radius = voxel_size * out_size_factor * kenel_size
-        local_max_inner = F.max_pool2d(
+        local_max_inner = F.max_pool2d( # 使用最大池化得到局部最大值
             heatmap, kernel_size=self.nms_kernel_size, stride=1, padding=0
         )
-        local_max[:, :, padding:(-padding), padding:(-padding)] = local_max_inner
-        ## for Pedestrian & Traffic_cone in nuScenes
+        local_max[:, :, padding:(-padding), padding:(-padding)] = local_max_inner # 填入到local_max中
+        ## for Pedestrian & Traffic_cone in nuScenes 这两个类别使用原来的heatmap而不是K=3的局部最大heatmap
         if self.test_cfg["dataset"] == "nuScenes":
             local_max[
                 :,
@@ -263,16 +263,16 @@ class TransFusionHead(nn.Module):
                 :,
                 2,
             ] = F.max_pool2d(heatmap[:, 2], kernel_size=1, stride=1, padding=0)
-        heatmap = heatmap * (heatmap == local_max)
+        heatmap = heatmap * (heatmap == local_max) # 找到Pedestrian & Traffic_cone的heatmap,以及该点是否为k=3周围最大值点，对应transfusion中的8点最值(Input-dependent)
         heatmap = heatmap.view(batch_size, heatmap.shape[1], -1)
 
-        # top #num_proposals among all classes
+        # top #num_proposals among all classes 找到前num_proposals个最大的proposals，说明这些是潜在的queries
         top_proposals = heatmap.view(batch_size, -1).argsort(dim=-1, descending=True)[
             ..., : self.num_proposals
         ]
-        top_proposals_class = top_proposals // heatmap.shape[-1]
-        top_proposals_index = top_proposals % heatmap.shape[-1]
-        query_feat = lidar_feat_flatten.gather(
+        top_proposals_class = top_proposals // heatmap.shape[-1] # 计算这些proposals都属于哪个类别
+        top_proposals_index = top_proposals % heatmap.shape[-1] # 计算这些proposals在该类别的索引
+        query_feat = lidar_feat_flatten.gather( # query_feat:[B, C:128, num_proposals:200] 按照heatmap的索引，从[B, C, H*W]中挑选[B, C, 200]组成queries
             index=top_proposals_index[:, None, :].expand(
                 -1, lidar_feat_flatten.shape[1], -1
             ),
@@ -280,14 +280,14 @@ class TransFusionHead(nn.Module):
         )
         self.query_labels = top_proposals_class
 
-        # add category embedding
+        # add category embedding 将前200个对应的类别进行onehot编码
         one_hot = F.one_hot(top_proposals_class, num_classes=self.num_classes).permute(
             0, 2, 1
         )
-        query_cat_encoding = self.class_encoding(one_hot.float())
-        query_feat += query_cat_encoding
+        query_cat_encoding = self.class_encoding(one_hot.float()) # transfusion的类别嵌入 10 -> 128
+        query_feat += query_cat_encoding # 加入类别嵌入
 
-        query_pos = bev_pos.gather(
+        query_pos = bev_pos.gather( # [B, 200, 2] 获取前200个最大proposals的queries位置
             index=top_proposals_index[:, None, :]
             .permute(0, 2, 1)
             .expand(-1, -1, bev_pos.shape[-1]),
@@ -309,7 +309,7 @@ class TransFusionHead(nn.Module):
 
             # Prediction
             res_layer = self.prediction_heads[i](query_feat)
-            res_layer["center"] = res_layer["center"] + query_pos.permute(0, 2, 1)
+            res_layer["center"] = res_layer["center"] + query_pos.permute(0, 2, 1) # 将预测中心点坐标移动到query_pos下
             first_res_layer = res_layer
             ret_dicts.append(res_layer)
 
@@ -437,8 +437,8 @@ class TransFusionHead(nn.Module):
         boxes_dict = self.bbox_coder.decode(
             score, rot, dim, center, height, vel
         )  # decode the prediction to real world metric bbox
-        bboxes_tensor = boxes_dict[0]["bboxes"]
-        gt_bboxes_tensor = gt_bboxes_3d.tensor.to(score.device)
+        bboxes_tensor = boxes_dict[0]["bboxes"] # bboxes_tensor:[num_proposals 200, 9]
+        gt_bboxes_tensor = gt_bboxes_3d.tensor.to(score.device) # [34:为GT_box的个数, 9]
         # each layer should do label assign seperately.
         if self.auxiliary:
             num_layer = self.num_decoder_layers
@@ -447,15 +447,15 @@ class TransFusionHead(nn.Module):
 
         assign_result_list = []
         for idx_layer in range(num_layer):
-            bboxes_tensor_layer = bboxes_tensor[
+            bboxes_tensor_layer = bboxes_tensor[ # 预测的bbox位置信息
                 self.num_proposals * idx_layer : self.num_proposals * (idx_layer + 1), :
             ]
-            score_layer = score[
+            score_layer = score[ # 预测的score值
                 ...,
                 self.num_proposals * idx_layer : self.num_proposals * (idx_layer + 1),
             ]
 
-            if self.train_cfg.assigner.type == "HungarianAssigner3D":
+            if self.train_cfg.assigner.type == "HungarianAssigner3D": # 匈牙利分配算匹配bbox与GT,正负样本定义或者正负样本分配
                 assign_result = self.bbox_assigner.assign(
                     bboxes_tensor_layer,
                     gt_bboxes_tensor,
@@ -482,7 +482,7 @@ class TransFusionHead(nn.Module):
             max_overlaps=torch.cat([res.max_overlaps for res in assign_result_list]),
             labels=torch.cat([res.labels for res in assign_result_list]),
         )
-        sampling_result = self.bbox_sampler.sample(
+        sampling_result = self.bbox_sampler.sample( # 确定每个样本的正负属性后，可能还需要进行样本平衡操作。数据极度不平衡情况下进行分类会出现预测倾向于样本多的类别，出现过拟合
             assign_result_ensemble, bboxes_tensor, gt_bboxes_tensor
         )
         pos_inds = sampling_result.pos_inds

@@ -91,18 +91,18 @@ class TransformerDecoderLayer(nn.Module):
         key = key.permute(2, 0, 1)
 
         if not self.cross_only:
-            q = k = v = self.with_pos_embed(query, query_pos_embed)
-            query2 = self.self_attn(q, k, value=v)[0]
+            q = k = v = self.with_pos_embed(query, query_pos_embed) # 添加位置编码
+            query2 = self.self_attn(q, k, value=v)[0] # self attn
             query = query + self.dropout1(query2)
             query = self.norm1(query)
 
-        query2 = self.multihead_attn(query=self.with_pos_embed(query, query_pos_embed),
+        query2 = self.multihead_attn(query=self.with_pos_embed(query, query_pos_embed), # multihead attn
                                      key=self.with_pos_embed(key, key_pos_embed),
                                      value=self.with_pos_embed(key, key_pos_embed), attn_mask=attn_mask)[0]
         query = query + self.dropout2(query2)
         query = self.norm2(query)
 
-        query2 = self.linear2(self.dropout(self.activation(self.linear1(query))))
+        query2 = self.linear2(self.dropout(self.activation(self.linear1(query)))) # FFN
         query = query + self.dropout3(query2)
         query = self.norm3(query)
 
