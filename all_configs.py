@@ -1,4 +1,3 @@
-# 1.defailt_runtime
 seed = 0
 deterministic = False
 checkpoint_config = dict(interval=1, max_keep_ckpts=1)
@@ -12,18 +11,6 @@ cudnn_benchmark = False
 fp16 = dict(loss_scale=dict(growth_interval=2000))
 max_epochs = 6
 runner = dict(type='CustomEpochBasedRunner', max_epochs=6)
-optimizer = dict(type='AdamW', lr=0.0002, weight_decay=0.01)
-optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
-lr_config = dict(
-    policy='CosineAnnealing',
-    warmup='linear',
-    warmup_iters=500,
-    warmup_ratio=0.33333333,
-    min_lr_ratio=0.001)
-momentum_config = dict(policy='cyclic')
-run_dir = 'runs/run-a9f7ca02-40b92c21'
-
-# 2.datasets
 dataset_type = 'NuScenesDataset'
 dataset_root = 'data/nuscenes/'
 gt_paste_stop_epoch = -1
@@ -54,7 +41,6 @@ input_modality = dict(
     use_radar=False,
     use_map=False,
     use_external=False)
-
 train_pipeline = [
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
     dict(
@@ -186,7 +172,6 @@ train_pipeline = [
             'camera2lidar', 'lidar2image', 'img_aug_matrix', 'lidar_aug_matrix'
         ])
 ]
-
 test_pipeline = [
     dict(type='LoadMultiViewImageFromFiles', to_float32=True),
     dict(
@@ -254,10 +239,9 @@ test_pipeline = [
             'camera2lidar', 'lidar2image', 'img_aug_matrix', 'lidar_aug_matrix'
         ])
 ]
-
 data = dict(
-    samples_per_gpu=1,
-    workers_per_gpu=0,
+    samples_per_gpu=2,
+    workers_per_gpu=1,
     train=dict(
         type='CBGSDataset',
         dataset=dict(
@@ -603,7 +587,6 @@ data = dict(
             use_external=False),
         test_mode=True,
         box_type_3d='LiDAR'))
-
 evaluation = dict(
     interval=1,
     pipeline=[
@@ -677,12 +660,30 @@ evaluation = dict(
                 'lidar_aug_matrix'
             ])
     ])
-
-# 3.model
 model = dict(
     type='BEVFusion',
     encoders=dict(
-        camera=dict( # 提取相机特征
+        camera=dict(
+            neck=dict(
+                type='GeneralizedLSSFPN',
+                in_channels=[192, 384, 768],
+                out_channels=256,
+                start_level=0,
+                num_outs=3,
+                norm_cfg=dict(type='BN2d', requires_grad=True),
+                act_cfg=dict(type='ReLU', inplace=True),
+                upsample_cfg=dict(mode='bilinear', align_corners=False)),
+            vtransform=dict(
+                type='DepthLSSTransform',
+                in_channels=256,
+                out_channels=80,
+                image_size=[256, 704],
+                feature_size=[32, 88],
+                xbound=[-54.0, 54.0, 0.3],
+                ybound=[-54.0, 54.0, 0.3],
+                zbound=[-10.0, 10.0, 20.0],
+                dbound=[1.0, 60.0, 0.5],
+                downsample=2),
             backbone=dict(
                 type='SwinTransformer',
                 embed_dims=96,
@@ -703,29 +704,8 @@ model = dict(
                     type='Pretrained',
                     checkpoint=
                     'https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth'
-                )),
-            neck=dict(
-                type='GeneralizedLSSFPN',
-                in_channels=[192, 384, 768],
-                out_channels=256,
-                start_level=0,
-                num_outs=3,
-                norm_cfg=dict(type='BN2d', requires_grad=True),
-                act_cfg=dict(type='ReLU', inplace=True),
-                upsample_cfg=dict(mode='bilinear', align_corners=False)),
-            vtransform=dict(
-                type='DepthLSSTransform',
-                in_channels=256,
-                out_channels=80,
-                image_size=[256, 704],
-                feature_size=[32, 88],
-                xbound=[-54.0, 54.0, 0.3],
-                ybound=[-54.0, 54.0, 0.3],
-                zbound=[-10.0, 10.0, 20.0],
-                dbound=[1.0, 60.0, 0.5],
-                downsample=2)
-            ),
-        lidar=dict( # 提取点云特征
+                ))),
+        lidar=dict(
             voxelize=dict(
                 max_num_points=10,
                 point_cloud_range=[-54.0, -54.0, -5.0, 54.0, 54.0, 3.0],
@@ -742,7 +722,7 @@ model = dict(
                 encoder_paddings=[[0, 0, 1], [0, 0, 1], [0, 0, [1, 1, 0]],
                                   [0, 0]],
                 block_type='basicblock'))),
-    fuser=dict(type='ConvFuser', in_channels=[80, 256], out_channels=256), # img+pts特征concat后卷积提取特征
+    fuser=dict(type='ConvFuser', in_channels=[80, 256], out_channels=256),
     heads=dict(
         map=None,
         object=dict(
@@ -789,7 +769,7 @@ model = dict(
                 voxel_size=[0.075, 0.075],
                 pc_range=[-54.0, -54.0],
                 nms_type=None),
-            common_heads=dict( # [3, 2] 3表示最后输出数据的维度为3， 2表示该head对应的pred_head网络层数为2
+            common_heads=dict(
                 center=[2, 2],
                 height=[1, 2],
                 dim=[3, 2],
@@ -814,8 +794,6 @@ model = dict(
                 type='GaussianFocalLoss', reduction='mean', loss_weight=1.0),
             loss_bbox=dict(type='L1Loss', reduction='mean',
                            loss_weight=0.25))),
-    
-    # BEVencoder
     decoder=dict(
         backbone=dict(
             type='SECOND',
@@ -833,3 +811,13 @@ model = dict(
             norm_cfg=dict(type='BN', eps=0.001, momentum=0.01),
             upsample_cfg=dict(type='deconv', bias=False),
             use_conv_for_no_stride=True)))
+optimizer = dict(type='AdamW', lr=0.0002, weight_decay=0.01)
+optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+lr_config = dict(
+    policy='CosineAnnealing',
+    warmup='linear',
+    warmup_iters=500,
+    warmup_ratio=0.33333333,
+    min_lr_ratio=0.001)
+momentum_config = dict(policy='cyclic')
+run_dir = 'runs/run-8569b9c7-efd4f6f9'

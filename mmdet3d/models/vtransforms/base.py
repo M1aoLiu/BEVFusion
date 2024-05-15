@@ -238,7 +238,7 @@ class BaseDepthTransform(BaseTransform):
         batch_size = len(points)
         depth = torch.zeros(batch_size, img.shape[1], 1, *self.image_size).to(
             points[0].device
-        ) # [B, views, 1, img_H 256, img_W 704]
+        ) # 投影到图像上生成的深度：[B, views, 1, img_H 256, img_W 704]
 
         for b in range(batch_size):
             cur_coords = points[b][:, :3]
@@ -251,13 +251,13 @@ class BaseDepthTransform(BaseTransform):
             cur_coords = torch.inverse(cur_lidar_aug_matrix[:3, :3]).matmul( # 再求逆矩阵得到原始坐标(lidar坐标)
                 cur_coords.transpose(1, 0)
             )
-            # lidar2image 使用外参矩阵进行坐标转换
+            # lidar2image 使用外参矩阵进行坐标转换 备注：是否可参考BEVDepth添加相机参数，防止直接使用校准矩阵出现的误差问题
             cur_coords = cur_lidar2image[:, :3, :3].matmul(cur_coords)
-            cur_coords += cur_lidar2image[:, :3, 3].reshape(-1, 3, 1)
+            cur_coords += cur_lidar2image[:, :3, 3].reshape(-1, 3, 1) # cur_coords:[ud, vd, d]
             # get 2d coords
-            dist = cur_coords[:, 2, :] # 图像坐标系下的深度信息
+            dist = cur_coords[:, 2, :] # 图像坐标系下(xyz)的深度信息z
             cur_coords[:, 2, :] = torch.clamp(cur_coords[:, 2, :], 1e-5, 1e5) # 将深度范围限制为[1e-5, 1e5]
-            cur_coords[:, :2, :] /= cur_coords[:, 2:3, :] # 除以深度信息，得到真实的像素坐标值
+            cur_coords[:, :2, :] /= cur_coords[:, 2:3, :] # 除以深度信息d: [ud, vd, d] / d，得到真实的像素坐标值[u, v, 1]
 
             # imgaug
             cur_coords = cur_img_aug_matrix[:, :3, :3].matmul(cur_coords)
@@ -290,6 +290,6 @@ class BaseDepthTransform(BaseTransform):
             extra_trans=extra_trans,
         )
 
-        x = self.get_cam_feats(img, depth) # context特征点云 [1, 6, 118, 32, 88, 80]
+        x = self.get_cam_feats(img, depth) # Depth-aware camera feature [1, 6, 118, 32, 88, 80]
         x = self.bev_pool(geom, x) # bev池化,得到BEV下的相机特征 [1, 80, 360, 360] 360: [-54, 54, 0.3]
         return x
