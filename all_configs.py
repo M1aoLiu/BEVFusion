@@ -2,15 +2,15 @@ seed = 0
 deterministic = False
 checkpoint_config = dict(interval=1, max_keep_ckpts=1)
 log_config = dict(
-    interval=50,
+    interval=20,
     hooks=[dict(type='TextLoggerHook'),
            dict(type='TensorboardLoggerHook')])
-load_from = None
+load_from = 'pretrained/lidar-only-det.pth'
 resume_from = None
 cudnn_benchmark = False
 fp16 = dict(loss_scale=dict(growth_interval=2000))
-max_epochs = 6
-runner = dict(type='CustomEpochBasedRunner', max_epochs=6)
+max_epochs = 1
+runner = dict(type='CustomEpochBasedRunner', max_epochs=1)
 dataset_type = 'NuScenesDataset'
 dataset_root = 'data/nuscenes/'
 gt_paste_stop_epoch = -1
@@ -150,7 +150,7 @@ train_pipeline = [
         type='GridMask',
         use_h=True,
         use_w=True,
-        max_epoch=6,
+        max_epoch=1,
         rotate=1,
         offset=False,
         ratio=0.5,
@@ -358,7 +358,7 @@ data = dict(
                     type='GridMask',
                     use_h=True,
                     use_w=True,
-                    max_epoch=6,
+                    max_epoch=1,
                     rotate=1,
                     offset=False,
                     ratio=0.5,
@@ -702,9 +702,7 @@ model = dict(
                 convert_weights=True,
                 init_cfg=dict(
                     type='Pretrained',
-                    checkpoint=
-                    'https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth'
-                ))),
+                    checkpoint='pretrained/swint-nuimages-pretrained.pth'))),
         lidar=dict(
             voxelize=dict(
                 max_num_points=10,
@@ -820,4 +818,4 @@ lr_config = dict(
     warmup_ratio=0.33333333,
     min_lr_ratio=0.001)
 momentum_config = dict(policy='cyclic')
-run_dir = 'runs/run-8569b9c7-efd4f6f9'
+run_dir = 'runs/run-23d9399c-016c083d'
