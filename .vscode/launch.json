@@ -10,8 +10,8 @@
             "request": "launch",
             "program": "tools/train_single.py",
             "console": "integratedTerminal",
-            "args": ["configs/nuscenes/det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml"]
-
+            "args": ["configs/nuscenes/det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml"],
+            "justMyCode": false
         }
     ]
 }
