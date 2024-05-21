@@ -92,7 +92,7 @@ class TransformerDecoderLayer(nn.Module):
 
         if not self.cross_only:
             q = k = v = self.with_pos_embed(query, query_pos_embed) # 添加位置编码
-            query2 = self.self_attn(q, k, value=v)[0] # self attn
+            query2 = self.self_attn(q, k, value=v)[0] # self attn 与cross attn不同，用的都是q,k,v 后者用的是query, key, value
             query = query + self.dropout1(query2)
             query = self.norm1(query)
 

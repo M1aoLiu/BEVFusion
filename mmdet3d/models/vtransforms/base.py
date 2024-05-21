@@ -252,7 +252,7 @@ class BaseDepthTransform(BaseTransform):
                 cur_coords.transpose(1, 0)
             )
             # lidar2image 使用外参矩阵进行坐标转换 备注：是否可参考BEVDepth添加相机参数，防止直接使用校准矩阵出现的误差问题
-            cur_coords = cur_lidar2image[:, :3, :3].matmul(cur_coords)
+            cur_coords = cur_lidar2image[:, :3, :3].matmul(cur_coords) # [views, 3, N]
             cur_coords += cur_lidar2image[:, :3, 3].reshape(-1, 3, 1) # cur_coords:[ud, vd, d]
             # get 2d coords
             dist = cur_coords[:, 2, :] # 图像坐标系下(xyz)的深度信息z
@@ -274,9 +274,11 @@ class BaseDepthTransform(BaseTransform):
                 & (cur_coords[..., 1] >= 0)
             )
             for c in range(on_img.shape[0]):
-                masked_coords = cur_coords[c, on_img[c]].long() # pts投影到img的点的个数和img坐标 [N, 2]
+                masked_coords = cur_coords[c, on_img[c]].long() # pts投影到img的点的个数和img坐标 [N, 2] 这里将浮点数变为整数
                 masked_dist = dist[c, on_img[c]] # 该point投影到img时的深度信息 [N, 1]
-                depth[b, c, 0, masked_coords[:, 0], masked_coords[:, 1]] = masked_dist # depth:[B, views, 1(深度值), 256 H, 704 W] pts投影到img的深度图
+                # depth:[B, views, 1(深度值), 256 H, 704 W] pts投影到img的深度图
+                # 注意depth的0元素个数仍会大于非零元素个数，因为点云是稀疏的大部分的点云没有被投影到图像上
+                depth[b, c, 0, masked_coords[:, 0], masked_coords[:, 1]] = masked_dist
 
         extra_rots = lidar_aug_matrix[..., :3, :3]
         extra_trans = lidar_aug_matrix[..., :3, 3]

@@ -258,8 +258,8 @@ class BEVFusion(Base3DFusionModel):
 
         batch_size = x.shape[0]
         # BEVencoder
-        x = self.decoder["backbone"](x) # x[0]:[B, 128, 180, 180], x[1]:[B, 256, 180, 180]
-        x = self.decoder["neck"](x) # x:[B, 512, 180, 180] Fused BEV Features
+        x = self.decoder["backbone"](x) # 实际上使用的是SECOND的RPN网络 x[0]:[B, 128, 180, 180], x[1]:[B, 256, 90, 90]
+        x = self.decoder["neck"](x) # 使用SECONDFPN融合， x:[B, 512, 180, 180] Fused BEV Features
 
         if self.training:
             outputs = {}

@@ -321,12 +321,12 @@ class TransFusionHead(nn.Module):
 
             # Transformer Decoder Layer
             # :param query: B C Pq    :param query_pos: B Pq 3/6
-            query_feat = self.decoder[i](
+            query_feat = self.decoder[i]( # query_feat:[B, C, 200]
                 query_feat, lidar_feat_flatten, query_pos, bev_pos
             )
 
             # Prediction
-            res_layer = self.prediction_heads[i](query_feat)
+            res_layer = self.prediction_heads[i](query_feat) # res_layer[key]:[B, c(取决于head输出的维度), 200]
             res_layer["center"] = res_layer["center"] + query_pos.permute(
                 0, 2, 1
             )  # 将预测中心点坐标移动到query_pos下
