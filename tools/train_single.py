@@ -17,14 +17,6 @@ from mmdet3d.models import build_model
 from mmdet3d.utils import get_root_logger, convert_sync_batchnorm, recursive_eval
 
 import sys
-# sys.argv = ['tools/train.py', 'configs/nuscenes/det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml',
-#             '--run-dir', 'Res/test_mini'
-# ]
-# sys.argv = ['tools/train.py', 'configs/once/det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml',
-#             '--run-dir', 'Res/test_once_mini'
-# ]
-
-#python tools/train.py configs/once/det/transfusion/secfpn/camera+lidar/swint_v0p075/convfuser.yaml --run-dir Res/test_once_mini_6cam
 def main():
     # dist.init()
 

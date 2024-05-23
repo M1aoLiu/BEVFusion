@@ -85,7 +85,7 @@ class DepthLSSTransform(BaseDepthTransform):
         d = d.view(B * N, *d.shape[2:])
         x = x.view(B * N, C, fH, fW)
 
-        d = self.dtransform(d) # [N, 1, H, W] -> [N, 64, fW 32 ,fH 88] 得到深度feature d
+        d = self.dtransform(d) # [B*N, 1, H, W] -> [B*N, 64, fW 32 ,fH 88] 得到深度feature d
         x = torch.cat([d, x], dim=1) # [N, d:64+c:256=320, 32, 88]
         x = self.depthnet(x) # [N, 198, 32, 88] 经过三层卷积(depthnet) 198:118深度 + 80图像的feature C
 
